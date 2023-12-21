@@ -17,6 +17,11 @@ const { Node } = require('../extensions/list-tree.js');
 class BinarySearchTree {
   rootNode = null;
 
+  #isEmptyTree() {
+    const isTreeWithoutNodes = !this.rootNode;
+    return isTreeWithoutNodes;
+  }
+
   #getNodeForData(dataToFind, currentNode) {
     if (!currentNode) {
       return null;
@@ -31,10 +36,12 @@ class BinarySearchTree {
   #getNodeStatusAndParent(dataToFind, currentNode, parentNode) {
     if (!currentNode) {
       const isNodeExists = false;
-      return {isNodeExists, parentNode};
+      const soughtNode = null;
+      return {isNodeExists, parentNode, soughtNode};
     } else if (dataToFind === currentNode.data) {
       const isNodeExists = true;
-      return {isNodeExists, parentNode};
+      const soughtNode = currentNode;
+      return {isNodeExists, parentNode, soughtNode};
     } else {
       parentNode = currentNode;
       currentNode = dataToFind < currentNode.data ? currentNode.left : currentNode.right;
@@ -47,18 +54,66 @@ class BinarySearchTree {
     return keyNext;
   }
 
-  #getExtremeValue(currentNode, previousNode, keyNext) {
+  #getExtremeNode(currentNode, previousNode, keyNext) {
     if (!currentNode) {
-      return previousNode.data;
+      return previousNode;
     }
     previousNode = currentNode;
     currentNode = currentNode[keyNext];
-    return this.#getExtremeValue(currentNode, previousNode, keyNext);
+    return this.#getExtremeNode(currentNode, previousNode, keyNext);
   }
 
-  #isNodeALeaf(nodeToCheck) {
+  #getExtremeNodeInSubtree(startNodeForSearch, extremeType = 'min') {
+    const keyNext = this.#getKeyNextValueForExtremeType(extremeType);
+    const currentNodeForSearch = startNodeForSearch[keyNext];
+    const nodeWithExtremeValue = this.#getExtremeNode(currentNodeForSearch, startNodeForSearch, keyNext);
+    return nodeWithExtremeValue;
+  }
+
+  #getMinNodeInSubtree(startNodeForSearch) {
+    const extremeTypeMin = 'min';
+    const nodeWithMinValue = this.#getExtremeNodeInSubtree(startNodeForSearch, extremeTypeMin);
+    return nodeWithMinValue;
+  }
+
+  #getMaxNodeInSubtree(startNodeForSearch) {
+    const extremeTypeMax = 'max';
+    const nodeWithMaxValue = this.#getExtremeNodeInSubtree(startNodeForSearch, extremeTypeMax);
+    return nodeWithMaxValue;
+  }
+
+  #isALeaf(nodeToCheck) {
     const isLeaf = !nodeToCheck.left && !nodeToCheck.right;
     return isLeaf;
+  }
+
+  #hasOneChildOrNone(nodeToCheck) {
+    const hasOneChildOrLess = !nodeToCheck.left || !nodeToCheck.right;
+    return hasOneChildOrLess;
+  }
+
+  #hasTwoChildren(nodeToCheck) {
+    const hasTwoChildrenExactly = nodeToCheck.left && nodeToCheck.right;
+    return hasTwoChildrenExactly;
+  }
+
+  #isRootNode(nodeToCheck) {
+    return nodeToCheck === this.rootNode;
+  }
+
+  #isLeftChild(nodeToCheck, parentNode) {
+    const isNodeALeftChild = nodeToCheck.data < parentNode.data;
+    return isNodeALeftChild;
+  }
+
+  #hasRightChild(nodeToCheck) {
+    const nodeHasRightChild = !!nodeToCheck.right;
+    return nodeHasRightChild;
+  }
+
+  #getSideToSwap(nodeToRemove) {
+    const sideToSwap = this.#hasRightChild(nodeToRemove) ? 'right' : 'left';
+    return sideToSwap;
   }
 
   root() {
@@ -67,7 +122,7 @@ class BinarySearchTree {
 
   add(data) {
     const newNode = new Node(data);
-    if (!this.rootNode) {
+    if (this.#isEmptyTree()) {
       this.rootNode = newNode;
     }
 
@@ -86,109 +141,80 @@ class BinarySearchTree {
   }
 
   has(data) {
-    const startNode = this.rootNode;
-    const dataNode = this.#getNodeForData(data, startNode);
-    const isDataNodeExists = !!dataNode;
+    if (this.#isEmptyTree()) {
+      return false;
+    }
+    const startNodeForSearch = this.rootNode;
+    const soughtNode = this.#getNodeForData(data, startNodeForSearch);
+    const isDataNodeExists = !!soughtNode;
     return isDataNodeExists;
   }
 
   find(data) {
-    const startNode = this.rootNode;
-    const dataNode = this.#getNodeForData(data, startNode);
-    return dataNode;
+    if (this.#isEmptyTree()) {
+      return null;
+    }
+    const startNodeForSearch = this.rootNode;
+    const soughtNode = this.#getNodeForData(data, startNodeForSearch);
+    return soughtNode;
   }
 
   remove(data) {
-    if (!this.rootNode) {
+    if (this.#isEmptyTree()) {
       return;
     }
 
     const startNode = this.rootNode;
     const previousNode = null;
-    const {isNodeExists, parentNode} = this.#getNodeStatusAndParent(data, startNode, previousNode);
+    const {isNodeExists, parentNode, soughtNode: nodeToRemove} = this.#getNodeStatusAndParent(data, startNode, previousNode);
 
     if (!isNodeExists) {
       return;
     }
-    // remove root Node
-    if (!parentNode) {
-      const nodeToRemove = this.rootNode;
-      if (this.#isNodeALeaf(nodeToRemove)) {
-        this.rootNode = null;
-        return;
-      }
-      const nodeChildLeft = nodeToRemove.left;
-      const nodeChildRight = nodeToRemove.right;
-      if (!nodeChildLeft && !nodeChildRight) {
-        this.rootNode = null;
-      } else if (!nodeChildLeft) {
-        this.rootNode = nodeChildRight;
-      } else if (!nodeChildRight) {
-        this.rootNode = nodeChildLeft;
-      } else {
-        this.rootNode = nodeChildLeft;
-        const {_, parentNode: newParentForRightChild} = this.#getNodeStatusAndParent(nodeChildRight.data, nodeChildLeft.right, nodeChildLeft);
-        if (nodeChildRight.data < newParentForRightChild.data) {
-          newParentForRightChild.left = nodeChildRight;
-        } else {
-          newParentForRightChild.right = nodeChildRight;
-        }
-      }
-      return;
-    }
-    const keyChildToRemove = data < parentNode.data ? 'left' : 'right';
-    const nodeToRemove = parentNode[keyChildToRemove];
-    if (this.#isNodeALeaf(nodeToRemove)) {
-      parentNode[keyChildToRemove] = null;
-      return;
-    }
-    const nodeChildLeft = nodeToRemove.left;
-    const nodeChildRight = nodeToRemove.right;
 
-    if (nodeToRemove.data < parentNode.data) {
-      parentNode.left = nodeChildLeft;
-      if (nodeChildRight) {
-        const {_, parentNode: newParentForRightChild} = this.#getNodeStatusAndParent(nodeChildRight.data, nodeChildLeft, parentNode);
-        if (nodeChildRight.data < newParentForRightChild.data) {
-          newParentForRightChild.left = nodeChildRight;
-        } else {
-          newParentForRightChild.right = nodeChildRight;
-        }
-      }
+    if (this.#hasTwoChildren(nodeToRemove)) {
+      const startNodeForSearch = nodeToRemove.left;
+      const nodeMaxValueInLeftSubtree = this.#getMaxNodeInSubtree(startNodeForSearch);
+      const dataFromMaxNodeInLeftSubtree = nodeMaxValueInLeftSubtree.data;
+      this.remove(dataFromMaxNodeInLeftSubtree);
+      nodeToRemove.data = dataFromMaxNodeInLeftSubtree;
+      return;
+    }
+
+    let nodeToSwap;
+    if (this.#isALeaf(nodeToRemove)) {
+      nodeToSwap = null;
+    } else if (this.#hasOneChildOrNone(nodeToRemove)) {
+      const keyToSwap = this.#getSideToSwap(nodeToRemove);
+      nodeToSwap = nodeToRemove[keyToSwap];
+    }
+
+    if (this.#isRootNode(nodeToRemove)) {
+      this.rootNode = nodeToSwap;
+    } else if (this.#isLeftChild(nodeToRemove, parentNode)) {
+      parentNode.left = nodeToSwap;
     } else {
-      parentNode.right = nodeChildRight;
-      if (nodeChildLeft) {
-        const {_, parentNode: newParentForLeftChild} = this.#getNodeStatusAndParent(nodeChildLeft.data, nodeChildRight, parentNode);
-        if (nodeChildLeft.data < newParentForLeftChild.data) {
-          newParentForLeftChild.left = nodeChildLeft;
-        } else {
-          newParentForLeftChild.right = nodeChildLeft;
-        }
-      }
+      parentNode.right = nodeToSwap;
     }
   }
 
   min() {
-    if (!this.rootNode) {
+    if (this.#isEmptyTree()) {
       return null;
     }
-    const previousNode = this.rootNode;
-    const currentNode = this.rootNode.left;
-    const extremeTypeMin = 'min';
-    const keyNext = this.#getKeyNextValueForExtremeType(extremeTypeMin);
-    const minValue = this.#getExtremeValue(currentNode, previousNode, keyNext);
+    const startNodeForSearch = this.rootNode;
+    const nodeWithMinValue = this.#getMinNodeInSubtree(startNodeForSearch);
+    const minValue = nodeWithMinValue.data;
     return minValue;
   }
 
   max() {
-    if (!this.rootNode) {
+    if (this.#isEmptyTree()) {
       return null;
     }
-    const previousNode = this.rootNode;
-    const currentNode = this.rootNode.right;
-    const extremeTypeMax = 'max';
-    const keyNext = this.#getKeyNextValueForExtremeType(extremeTypeMax);
-    const maxValue = this.#getExtremeValue(currentNode, previousNode, keyNext);
+    const startNodeForSearch = this.rootNode;
+    const nodeWithMaxValue = this.#getMaxNodeInSubtree(startNodeForSearch);
+    const maxValue = nodeWithMaxValue.data;
     return maxValue;
   }
 }
